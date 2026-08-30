@@ -70,14 +70,31 @@
 
 ## Roadmap (короткая версия)
 
-Полная версия — в корне в `task.md` (ТЗ) и в `.qwen/plans/925c7d80-b6a4-475a-99c7-ff8472c1c3cd.md` (план реализации). Кратко:
+Полная версия — в `.qwen/plans/925c7d80-b6a4-475a-99c7-ff8472c1c3cd.md` (план реализации).
+`task.md` (ТЗ) и `TODO.md` (roadmap) в `.gitignore` — это рабочие файлы, в репозиторий не входят.
 
-- ✅ MVP собран и работает (главное меню → игроки → новая игра → раунд → история → правила).
-- 🟡 Полировка MVP: ~20 пунктов в `TODO.md` раздел 2.
-- ⬜ v1.1: визуальный редактор правил, статистика (игры + игроки).
-- ⬜ v2: распознавание карт через камеру, спец-правила.
+Краткий статус (на тег v1.0.1):
+
+- ✅ **MVP** — собран и работает: главное меню → игроки → новая игра → раунд → история → правила.
+- ✅ **v1.0.0** — правила (визуальный редактор), статистика (игры + игроки, детальный экран), итоговая корректировка (FINAL_ADJUSTMENT), CardLimits, миграция БД v1→v2.
+- ✅ **v1.0.1** — bump версии (versionCode 1 → 2, versionName 1.0 → 1.0.1), фикс CI/CD (переименование APK по маске `101-counter-v<tag>.apk`).
+- ⬜ **v1.1+** — backlogs из `TODO.md`:
+  - Распознавание карт через камеру (CameraX + ML Kit).
+  - Спец-правила (бонус за единственного короля/даму и т.п.).
+  - Удаление/архивирование игроков через swipe (сейчас — иконка-кнопка).
+  - Улучшение UI ввода (текущая разбивка раунда на 2 экрана vs wizard).
+
+## CI/CD
+
+- `.github/workflows/ci.yml` — на каждый PR/push в `main`: тесты + debug APK.
+- `.github/workflows/release.yml` — на push тега `v*`: подписанный release APK + GitHub Release.
+- Подпись через `keystore.properties` + 2 Secrets в GitHub (`KEYSTORE_BASE64`, `KEYSTORE_PROPERTIES_BASE64`).
+- Keystore НИКОГДА не коммитится — в `.gitignore` (`keystore.properties`, `keystore/`, `*.jks`, `*.keystore`).
+- APK после сборки переименовывается в `101-counter-v<tag>.apk` шагом `Rename APK with version and tag`.
+- Текущая версия приложения: `versionName = "1.0.1"`, `versionCode = 2`. Меняется в `app/build.gradle.kts` перед каждым релизом.
 
 ## Известные особенности среды
 
 - `todo_write` в Qwen Code в этой среде заблокирован политикой. Прогресс ведётся в файлах `task.md` и `TODO.md`.
 - Шаблонные `MainActivity.kt`/`Theme.kt`/`Color.kt`/`strings.xml` и т.п. уже заменены — стартовые «Hello Android» / `Purple40` стёрты.
+- `TODO.md`, `task.md`, `.idea/`, `local.properties` — в `.gitignore`, не отслеживаются.
