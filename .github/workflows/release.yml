@@ -82,6 +82,15 @@ jobs:
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
 
+      # Переименовываем app-release.apk → 101-counter-v<tag>.apk, чтобы
+      # следующие шаги и upload-artifact в release могли найти файл по маске.
+      - name: Rename APK with version and tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          mv app/build/outputs/apk/release/app-release.apk \
+             "app/build/outputs/apk/release/101-counter-${TAG}.apk"
+          ls -la app/build/outputs/apk/release/
+
       - name: Verify APK
         run: |
           ls -la app/build/outputs/apk/release/
