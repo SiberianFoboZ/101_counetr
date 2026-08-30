@@ -87,6 +87,10 @@ jobs:
       - name: Rename APK with version and tag
         run: |
           TAG="${GITHUB_REF_NAME}"
+          # Ensure TAG starts with 'v', add it if missing
+          if [[ ! "$TAG" =~ ^v ]]; then
+            TAG="v${TAG}"
+          fi
           mv app/build/outputs/apk/release/app-release.apk \
              "app/build/outputs/apk/release/101-counter-${TAG}.apk"
           ls -la app/build/outputs/apk/release/
