@@ -176,7 +176,7 @@ class RoundInputViewModel(private val container: AppContainer) : ViewModel() {
                         hands = handFlow.value,
                     ),
                 )
-                savedRoundFlow.value = (state.value.savedRoundNumber ?: 0) + 1
+                savedRoundFlow.value = result.roundNumber
                 handFlow.value = emptyMap()
                 winnerFlow.value = null
                 winnerDeltaFlow.value = 0

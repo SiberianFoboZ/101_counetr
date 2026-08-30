@@ -38,15 +38,28 @@ class RuleEngine {
      * 4) складываем всё в deltaScore.
      */
     fun compute(rules: List<RuleEntity>, ctx: RuleContext): Int {
-        val sorted = rules.filter { it.enabled }.sortedByDescending { it.priority }
+        val sortedParsed = rules
+            .filter { it.enabled }
+            .mapNotNull { rule ->
+                val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: return@mapNotNull null
+                rule to def
+            }
+            .sortedByDescending { it.first.priority }
+        return computeWith(sortedParsed, ctx)
+    }
 
+    /**
+     * Перегрузка, принимающая уже распарсенные и отсортированные правила. Используется
+     * для пакетного применения правил (например, в [GamesRepository.saveRound]), чтобы
+     * не парсить JSON по 12×N раз.
+     */
+    fun computeWith(
+        parsedRules: List<Pair<RuleEntity, RuleDefinition.Rule>>,
+        ctx: RuleContext,
+    ): Int {
         // Фаза 1: per-card правила.
         var rawDelta = 0
-        val perCard = sorted.mapNotNull { rule ->
-            val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: return@mapNotNull null
-            if (def.kind != RuleDefinition.Kind.PER_CARD) return@mapNotNull null
-            rule to def
-        }
+        val perCard = parsedRules.filter { it.second.kind == RuleDefinition.Kind.PER_CARD }
         for ((rule, def) in perCard) {
             val handCount = ctx.hand.cards.filter { it.cardCode == rule.appliesToCard }
                 .sumOf { it.count }
@@ -88,11 +101,7 @@ class RuleEngine {
 
         // Фаза 2: final-adjustment правила (например «обнулить при total ≥ 101»).
         val totalAfter = ctx.totalScoreBeforeRound + rawDelta
-        val finalAdjustments = sorted.mapNotNull { rule ->
-            val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: return@mapNotNull null
-            if (def.kind != RuleDefinition.Kind.FINAL_ADJUSTMENT) return@mapNotNull null
-            rule to def
-        }
+        val finalAdjustments = parsedRules.filter { it.second.kind == RuleDefinition.Kind.FINAL_ADJUSTMENT }
         var finalDelta = 0
         for ((_, def) in finalAdjustments) {
             val condOk = def.match.condition?.let { c ->

@@ -91,6 +91,13 @@ class GamesRepository(
         val cardDefs = cardRepo.listAll().associateBy { it.code }
         val enabledRules = rulesRepo.listEnabled()
 
+        // Парсим правила ОДИН РАЗ для всего раунда, чтобы не парсить 12×N раз.
+        val parsedRules = enabledRules.mapNotNull { rule ->
+            val def = com.counter.game.engine.RuleDefinition.parseOrNull(rule.definitionJson)
+                ?: return@mapNotNull null
+            rule to def
+        }
+
         val roundNumber = roundDao.maxRoundNumber(input.gameId) + 1
         val roundId = roundDao.insert(
             RoundEntity(gameId = input.gameId, roundNumber = roundNumber),
@@ -119,7 +126,7 @@ class GamesRepository(
                     hand = RoundHand(cards = cards),
                     totalScoreBeforeRound = gamePlayerDao.totalScore(input.gameId, gp.id),
                 )
-                engine.compute(enabledRules, ctx)
+                engine.computeWith(parsedRules, ctx)
             }
             roundEntryDao.updateDelta(entryId, delta)
         }
@@ -139,6 +146,7 @@ class GamesRepository(
 
         RoundResult(
             gameId = input.gameId,
+            roundNumber = roundNumber,
             scores = scores,
             winnerPlayerId = winnerPlayerId,
             thresholdScore = settings.thresholdScore,
