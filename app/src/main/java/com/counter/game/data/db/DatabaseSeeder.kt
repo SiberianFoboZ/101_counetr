@@ -67,6 +67,9 @@ object DatabaseSeeder {
             Row("K_diamonds", "Король ♦", 4, true),
             Row("K_clubs", "Король ♣", 4, true),
             Row("K_spades", "Король ♠", 4, true),
+            // Синтетическая «карта» для FINAL_ADJUSTMENT правил (обнуление при 101 и т.п.).
+            // Используется как applies_to_card у таких правил, чтобы удовлетворить FK constraint.
+            Row("_final", "—", 0, false),
         )
     }
 

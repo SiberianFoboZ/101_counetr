@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 data class HomeState(
     val hasPausedGame: Boolean = false,
@@ -29,10 +30,12 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun requestResume(onResult: (Long?) -> Unit) {
-        viewModelScope.launch {
-            val id = container.gamesRepository.latestPausedId()
-            if (id != null) container.gamesRepository.resume(id)
-            onResult(id)
+        // Синхронно: корутина на viewModelScope может быть отменена при popUpTo(Home),
+        // и тогда игра останется в PAUSED, а юзер зайдёт в неё снова как в paused.
+        val id = runBlocking { container.gamesRepository.latestPausedId() }
+        if (id != null) {
+            runBlocking { container.gamesRepository.resume(id) }
         }
+        onResult(id)
     }
 }

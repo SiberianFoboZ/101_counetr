@@ -19,6 +19,11 @@ data class RuleContext(
     val settings: SettingsEntity,
     val cardDefs: Map<String, CardDefinitionEntity>,
     val hand: RoundHand,
+    /**
+     * Итоговый счёт игрока до раунда. Используется FINAL_ADJUSTMENT правилами.
+     * Если не передано — считается 0 (полезно для превью в редакторе правил).
+     */
+    val totalScoreBeforeRound: Int = 0,
 )
 
 /**
@@ -33,22 +38,23 @@ class RuleEngine {
      * 4) складываем всё в deltaScore.
      */
     fun compute(rules: List<RuleEntity>, ctx: RuleContext): Int {
-        var delta = 0
-        var soFar = 0
         val sorted = rules.filter { it.enabled }.sortedByDescending { it.priority }
-        for (rule in sorted) {
-            val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: continue
-            // Базовая "card_count" — по applies_to_card
+
+        // Фаза 1: per-card правила.
+        var rawDelta = 0
+        val perCard = sorted.mapNotNull { rule ->
+            val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: return@mapNotNull null
+            if (def.kind != RuleDefinition.Kind.PER_CARD) return@mapNotNull null
+            rule to def
+        }
+        for ((rule, def) in perCard) {
             val handCount = ctx.hand.cards.filter { it.cardCode == rule.appliesToCard }
                 .sumOf { it.count }
             if (handCount == 0) continue
 
-            // Если applies_to_card — конкретный код (например "K_spades"), проверяем match.suit/nominal
-            // против baseValue этого кода и масти, вытащенной из кода.
             val cardDef = ctx.cardDefs[rule.appliesToCard] ?: continue
             val suitFromCode = suitOf(rule.appliesToCard)
 
-            // match.nominal
             val nominalOk = when (val n = def.match.nominal) {
                 RuleDefinition.NominalPredicate.Any -> true
                 is RuleDefinition.NominalPredicate.Eq -> n.value == cardDef.baseValue
@@ -57,7 +63,6 @@ class RuleEngine {
             }
             if (!nominalOk) continue
 
-            // match.suit
             val suitOk = when (def.match.suit) {
                 RuleDefinition.SuitPredicate.ANY -> true
                 RuleDefinition.SuitPredicate.SPADES -> suitFromCode == "spades"
@@ -70,38 +75,67 @@ class RuleEngine {
             }
             if (!suitOk) continue
 
-            // match.condition
             val condOk = def.match.condition?.let { c ->
-                val l = resolveOperand(c.left, ctx, rule.appliesToCard)
-                val r = resolveOperand(c.right, ctx, rule.appliesToCard)
+                val l = resolveOperand(c.left, ctx, appliesTo = rule.appliesToCard)
+                val r = resolveOperand(c.right, ctx, appliesTo = rule.appliesToCard)
                 compare(c.op, l, r)
             } ?: true
-            if (!condOk) continue
 
-            // then / else
             val action = if (condOk) def.then else def.elseAction
             val value = resolveAction(action, ctx, rule.appliesToCard, handCount)
-            delta += value
-            soFar += value
+            rawDelta += value
         }
-        return delta
+
+        // Фаза 2: final-adjustment правила (например «обнулить при total ≥ 101»).
+        val totalAfter = ctx.totalScoreBeforeRound + rawDelta
+        val finalAdjustments = sorted.mapNotNull { rule ->
+            val def = RuleDefinition.parseOrNull(rule.definitionJson) ?: return@mapNotNull null
+            if (def.kind != RuleDefinition.Kind.FINAL_ADJUSTMENT) return@mapNotNull null
+            rule to def
+        }
+        var finalDelta = 0
+        for ((_, def) in finalAdjustments) {
+            val condOk = def.match.condition?.let { c ->
+                val l = resolveOperand(c.left, ctx, appliesTo = null, totalOverride = totalAfter)
+                val r = resolveOperand(c.right, ctx, appliesTo = null, totalOverride = totalAfter)
+                compare(c.op, l, r)
+            } ?: true
+            // Финальные правила: без аплиса и без карточной арифметики. Просто then.
+            if (!condOk) continue
+            val value = resolveFinalAction(def.then, totalAfter)
+            finalDelta += value
+        }
+
+        return rawDelta + finalDelta
     }
+
+    private fun resolveFinalAction(action: RuleDefinition.Action, totalAfter: Int): Int =
+        when (action) {
+            is RuleDefinition.Action.Const -> action.value
+            RuleDefinition.Action.BaseValue -> 0
+            is RuleDefinition.Action.Setting -> 0
+            RuleDefinition.Action.SubtractTotal -> -totalAfter
+        }
 
     private fun resolveOperand(
         op: RuleDefinition.Operand,
         ctx: RuleContext,
-        appliesTo: String,
+        appliesTo: String?,
+        totalOverride: Int? = null,
     ): Int = when (op) {
         is RuleDefinition.Operand.Const -> op.value
-        RuleDefinition.Operand.CardCount -> ctx.hand.cards
-            .filter { it.cardCode == appliesTo }
-            .sumOf { it.count }
-        RuleDefinition.Operand.RoundDeltaSoFar -> 0 // в пределах одного apply — 0; движок суммирует после
+        RuleDefinition.Operand.CardCount -> {
+            val code = appliesTo ?: return 0
+            ctx.hand.cards.filter { it.cardCode == code }.sumOf { it.count }
+        }
+        RuleDefinition.Operand.RoundDeltaSoFar -> 0
         RuleDefinition.Operand.DistinctCardCodes -> ctx.hand.cards
             .filter { it.count > 0 }
             .map { it.cardCode }
             .distinct()
             .size
+        RuleDefinition.Operand.TotalScore -> totalOverride
+            ?: (ctx.totalScoreBeforeRound)
     }
 
     private fun resolveAction(
@@ -122,6 +156,7 @@ class RuleEngine {
             "threshold_score" -> ctx.settings.thresholdScore
             else -> 0
         }
+        RuleDefinition.Action.SubtractTotal -> 0 // только в final-adjustment
     }
 
     private fun compare(op: RuleDefinition.Op, l: Int, r: Int): Boolean = when (op) {

@@ -35,6 +35,7 @@ fun HomeScreen(
     val state by vm.state.collectAsState()
     val pendingResumeId = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
 
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
     androidx.compose.runtime.LaunchedEffect(pendingResumeId.value) {
         pendingResumeId.value?.let { id ->
             onContinue(id)

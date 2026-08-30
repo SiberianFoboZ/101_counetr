@@ -43,16 +43,6 @@ class NewGameViewModel(private val container: AppContainer) : ViewModel() {
         selectedFlow.value = if (playerId in current) current - playerId else current + playerId
     }
 
-    fun addInline(name: String = ""): Long {
-        // Создаём сразу, чтобы UI мог его увидеть и показать как «нового».
-        var id = -1L
-        viewModelScope.launch {
-            id = container.playersRepository.add(name)
-            selectedFlow.value = selectedFlow.value + id
-        }
-        return id
-    }
-
     fun start() {
         val ids = selectedFlow.value.toList()
         if (ids.size !in 2..10) {

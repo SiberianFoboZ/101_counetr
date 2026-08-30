@@ -36,10 +36,13 @@ object RuleDefinition {
         val obj = json.parseToJsonElement(raw).jsonObject
         val version = (obj["version"] as? JsonPrimitive)?.intOrNull ?: VERSION
         require(version == VERSION) { "Unsupported rule version: $version" }
+        val kind = (obj["kind"] as? JsonPrimitive)?.content
+            ?.let { runCatching { Kind.valueOf(it.uppercase()) }.getOrNull() }
+            ?: Kind.PER_CARD
         val match = (obj["match"] as JsonObject).toMatch()
         val then = (obj["then"] as JsonObject).toAction()
         val els = (obj["else"] as JsonObject).toAction()
-        return Rule(match, then, els)
+        return Rule(match, then, els, kind)
     }
 
     fun parseOrNull(raw: String): Rule? = try {
@@ -52,7 +55,11 @@ object RuleDefinition {
         val match: Match,
         val then: Action,
         val elseAction: Action,
+        val kind: Kind = Kind.PER_CARD,
     )
+
+    /** Тип правила: per-card применяется к одной карте, final — к итогу игрока. */
+    enum class Kind { PER_CARD, FINAL_ADJUSTMENT }
 
     data class Match(
         val nominal: NominalPredicate,
@@ -74,6 +81,11 @@ object RuleDefinition {
         data object CardCount : Operand
         data object RoundDeltaSoFar : Operand
         data object DistinctCardCodes : Operand
+        /**
+         * Итоговый счёт игрока: totalScore до раунда + дельты текущего раунда по
+         * per-card правилам. Используется только в FINAL_ADJUSTMENT правилах.
+         */
+        data object TotalScore : Operand
     }
 
     enum class Op { EQ, NE, LT, LE, GT, GE }
@@ -88,6 +100,11 @@ object RuleDefinition {
         data class Const(val value: Int) : Action
         data object BaseValue : Action
         data class Setting(val key: String) : Action
+        /**
+         * delta = -totalScore (где totalScore — итог игрока на момент применения).
+         * Используется только в FINAL_ADJUSTMENT правилах.
+         */
+        data object SubtractTotal : Action
     }
 
     private fun JsonObject.toMatch(): Match {
@@ -116,12 +133,21 @@ object RuleDefinition {
 
     private fun JsonObject.toCondition(): Condition {
         val opStr = (this["op"] as JsonPrimitive).content
-        val op = runCatching { Op.valueOf(opStr.uppercase()) }.getOrElse {
-            throw IllegalArgumentException("Unknown condition op: $opStr")
-        }
+        val op = opFromStored(opStr)
+            ?: throw IllegalArgumentException("Unknown condition op: $opStr")
         val left = this["left"]!!.toOperand()
         val right = this["right"]!!.toOperand()
         return Condition(op, left, right)
+    }
+
+    private fun opFromStored(raw: String): Op? = when (raw) {
+        "==", "eq" -> Op.EQ
+        "!=", "ne" -> Op.NE
+        "<", "lt" -> Op.LT
+        "<=", "le" -> Op.LE
+        ">", "gt" -> Op.GT
+        ">=", "ge" -> Op.GE
+        else -> Op.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
     }
 
     private fun kotlinx.serialization.json.JsonElement.toOperand(): Operand = when (this) {
@@ -130,6 +156,7 @@ object RuleDefinition {
                 "card_count" -> Operand.CardCount
                 "round_delta_so_far" -> Operand.RoundDeltaSoFar
                 "distinct_card_codes" -> Operand.DistinctCardCodes
+                "total_score" -> Operand.TotalScore
                 else -> throw IllegalArgumentException("Unknown operand: $content")
             }
         } else Operand.Const(int())
@@ -151,6 +178,7 @@ object RuleDefinition {
             "const" -> Action.Const((this["value"] as JsonPrimitive).int())
             "base_value" -> Action.BaseValue
             "setting" -> Action.Setting((this["key"] as JsonPrimitive).content)
+            "subtract_total" -> Action.SubtractTotal
             else -> throw IllegalArgumentException("Unknown action type: $type")
         }
     }

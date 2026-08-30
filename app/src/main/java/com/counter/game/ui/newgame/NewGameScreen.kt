@@ -70,16 +70,7 @@ fun NewGameScreen(
                 ),
             )
         },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { vm.addInline() },
-                containerColor = Color.Black,
-                contentColor = Color.White,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text(" Игрок")
-            }
-        },
+        floatingActionButton = {},
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize().padding(innerPadding), color = MaterialTheme.colorScheme.background) {

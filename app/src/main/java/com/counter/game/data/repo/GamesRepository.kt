@@ -28,6 +28,7 @@ data class NewGameInput(
 data class RoundInput(
     val gameId: Long,
     val winnerGamePlayerId: Long?,
+    val winnerDelta: Int = 0,
     val hands: Map<Long, Map<String, Int>>,
 )
 
@@ -75,6 +76,14 @@ class GamesRepository(
         gameDao.setStatus(gameId, GameStatus.IN_PROGRESS.name)
     }
 
+    suspend fun finish(gameId: Long) {
+        gameDao.finish(
+            id = gameId,
+            finishedAt = System.currentTimeMillis(),
+            winnerId = null,
+        )
+    }
+
     suspend fun latestPausedId(): Long? = gameDao.latestByStatus(GameStatus.PAUSED.name)?.id
 
     suspend fun saveRound(input: RoundInput): RoundResult = db.withTransaction {
@@ -103,8 +112,13 @@ class GamesRepository(
                 .map { (code, count) -> RoundCardEntity(roundEntryId = entryId, cardCode = code, count = count) }
             if (cards.isNotEmpty()) roundEntryDao.insertCards(cards)
 
-            val delta = if (gp.id == winnerId) 0 else {
-                val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = RoundHand(cards = cards))
+            val delta = if (gp.id == winnerId) input.winnerDelta else {
+                val ctx = RuleContext(
+                    settings = settings,
+                    cardDefs = cardDefs,
+                    hand = RoundHand(cards = cards),
+                    totalScoreBeforeRound = gamePlayerDao.totalScore(input.gameId, gp.id),
+                )
                 engine.compute(enabledRules, ctx)
             }
             roundEntryDao.updateDelta(entryId, delta)

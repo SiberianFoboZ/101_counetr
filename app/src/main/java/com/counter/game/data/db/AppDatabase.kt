@@ -2,6 +2,8 @@ package com.counter.game.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.counter.game.data.dao.CardDefinitionDao
 import com.counter.game.data.dao.GameDao
 import com.counter.game.data.dao.GamePlayerDao
@@ -32,7 +34,7 @@ import com.counter.game.data.entity.SettingsEntity
         RoundEntryEntity::class,
         RoundCardEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,4 +46,20 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun gamePlayerDao(): GamePlayerDao
     abstract fun roundDao(): RoundDao
     abstract fun roundEntryDao(): RoundEntryDao
+
+    companion object {
+        /**
+         * v1 → v2: добавляем синтетическую «карту» `_final` для FINAL_ADJUSTMENT правил
+         * (обнуление при 101 и т.п.). У таких правил `applies_to_card` указывает на эту
+         * запись, чтобы удовлетворить FK constraint.
+         */
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "INSERT OR IGNORE INTO card_definitions(code, label, base_value, is_face) VALUES (?, ?, ?, ?)",
+                    arrayOf("_final", "—", 0, 0),
+                )
+            }
+        }
+    }
 }

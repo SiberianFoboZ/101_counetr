@@ -20,9 +20,13 @@ import com.counter.game.ui.history.HistoryScreen
 import com.counter.game.ui.home.HomeScreen
 import com.counter.game.ui.nav.Routes
 import com.counter.game.ui.newgame.NewGameScreen
+import com.counter.game.ui.player.PlayerDetailScreen
 import com.counter.game.ui.players.PlayersScreen
 import com.counter.game.ui.round.RoundInputScreen
+import com.counter.game.ui.rules.RuleEditScreen
+import com.counter.game.ui.rules.RulesScreen
 import com.counter.game.ui.settings.SettingsScreen
+import com.counter.game.ui.statistics.StatisticsScreen
 import com.counter.game.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -60,7 +64,7 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
                 },
                 onNewGame = { navController.navigate(Routes.NewGame.path) },
                 onPlayers = { navController.navigate(Routes.Players.path) },
-                onStatistics = { /* v1.1 */ },
+                onStatistics = { navController.navigate(Routes.Statistics.path) },
                 onSettings = { navController.navigate(Routes.Settings.path) },
             )
         }
@@ -68,7 +72,34 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
             PlayersScreen(container = container, onBack = { navController.popBackStack() })
         }
         composable(Routes.Settings.path) {
-            SettingsScreen(container = container, onBack = { navController.popBackStack() })
+            SettingsScreen(
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpenRules = { navController.navigate(Routes.Rules.path) },
+            )
+        }
+        composable(Routes.Rules.path) {
+            RulesScreen(
+                container = container,
+                onBack = { navController.popBackStack() },
+                onEditRule = { id -> navController.navigate(Routes.RuleEdit.build(id)) },
+            )
+        }
+        composable(
+            route = Routes.RuleEdit.path,
+            arguments = listOf(navArgument(Routes.RuleEdit.ARG) {
+                type = NavType.LongType
+                defaultValue = -1L
+            }),
+        ) { entry ->
+            val raw = entry.arguments?.getLong(Routes.RuleEdit.ARG) ?: -1L
+            val id: Long? = if (raw <= 0L) null else raw
+            RuleEditScreen(
+                container = container,
+                ruleId = id,
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(Routes.NewGame.path) {
             NewGameScreen(
@@ -112,6 +143,31 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
         ) { entry ->
             val id = entry.arguments?.getLong(Routes.History.ARG) ?: 0L
             HistoryScreen(container = container, gameId = id, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.Statistics.path) {
+            StatisticsScreen(
+                container = container,
+                onBack = { navController.popBackStack() },
+                onOpenGame = { id -> navController.navigate(Routes.History.build(id)) },
+                onOpenPlayer = { id -> navController.navigate(Routes.PlayerDetail.build(id)) },
+                onResumeGame = { id ->
+                    // Продолжить игру: тот же сценарий, что и «Продолжить» с главного.
+                    navController.navigate(Routes.Game.build(id)) {
+                        popUpTo(Routes.Home.path)
+                    }
+                },
+            )
+        }
+        composable(
+            route = Routes.PlayerDetail.path,
+            arguments = listOf(navArgument(Routes.PlayerDetail.ARG) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(Routes.PlayerDetail.ARG) ?: 0L
+            PlayerDetailScreen(
+                container = container,
+                playerId = id,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

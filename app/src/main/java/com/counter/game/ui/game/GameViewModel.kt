@@ -55,11 +55,24 @@ class GameViewModel(private val container: AppContainer) : ViewModel() {
         gameIdFlow.value = gameId
     }
 
-    fun pauseAndExit(after: () -> Unit) {
+    fun finishGame(after: () -> Unit) {
         val id = gameIdFlow.value ?: return
         viewModelScope.launch {
-            container.gamesRepository.pause(id)
+            container.gamesRepository.finish(id)
             after()
+        }
+    }
+
+    /**
+     * Вызывается при ON_STOP экрана игры. Ставит игру на паузу только если она ещё
+     * IN_PROGRESS — не трогает уже завершённые или на паузе.
+     */
+    fun autoPauseIfActive() {
+        val id = gameIdFlow.value ?: return
+        val current = state.value.game ?: return
+        if (current.status != GameStatus.IN_PROGRESS.name) return
+        viewModelScope.launch {
+            container.gamesRepository.pause(id)
         }
     }
 }

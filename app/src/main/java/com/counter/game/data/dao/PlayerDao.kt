@@ -32,4 +32,22 @@ interface PlayerDao {
 
     @Query("SELECT IFNULL(MAX(CAST(SUBSTR(name, 7) AS INTEGER)), 0) FROM players WHERE name LIKE 'Игрок %'")
     suspend fun maxDefaultNumber(): Int
+
+    /**
+     * Число побед и число игр для каждого не-архивного игрока.
+     * «Победа» = finished игра с winner_player_id = p.id.
+     * «Игры» = число game_players с player_id = p.id.
+     */
+    @Query(
+        """
+        SELECT p.id AS playerId, p.name AS name,
+               (SELECT COUNT(*) FROM games g
+                  WHERE g.winner_player_id = p.id AND g.status = 'FINISHED') AS wins,
+               (SELECT COUNT(*) FROM game_players gp WHERE gp.player_id = p.id) AS games
+        FROM players p
+        WHERE p.is_archived = 0
+        ORDER BY wins DESC, games DESC, p.name ASC
+        """,
+    )
+    fun observeStats(): Flow<List<PlayerStatsRow>>
 }

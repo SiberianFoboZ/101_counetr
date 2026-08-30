@@ -17,6 +17,20 @@ data class RoundEntryWithCards(
     val cardCount: Int?,
 )
 
+/**
+ * Плоский список «раунд → игрок → дельта → (карты)», для экрана истории.
+ * Карты размножают строки (LEFT JOIN), но `delta_score` у всех строк одного entry одинаков.
+ */
+data class RoundEntryCard(
+    val entryId: Long,
+    val roundId: Long,
+    val roundNumber: Int,
+    val gamePlayerId: Long,
+    val deltaScore: Int,
+    val cardCode: String?,
+    val cardCount: Int?,
+)
+
 @Dao
 interface RoundEntryDao {
     @Query(
@@ -25,12 +39,31 @@ interface RoundEntryDao {
                re.delta_score AS deltaScore, re.raw_input_json AS rawInputJson,
                rc.card_code AS cardCode, rc.count AS cardCount
         FROM round_entries re
+        INNER JOIN rounds r ON r.id = re.round_id
         LEFT JOIN round_cards rc ON rc.round_entry_id = re.id
-        WHERE re.round_id IN (SELECT id FROM rounds WHERE game_id = :gameId)
+        WHERE r.game_id = :gameId
         ORDER BY re.round_id ASC, re.game_player_id ASC
         """,
     )
     fun observeWithCards(gameId: Long): Flow<List<RoundEntryWithCards>>
+
+    /**
+     * Все entry для игры с размноженными картами. Используется для экрана истории,
+     * где нужен весь набор данных по каждому раунду.
+     */
+    @Query(
+        """
+        SELECT re.id AS entryId, re.round_id AS roundId, r.round_number AS roundNumber,
+               re.game_player_id AS gamePlayerId, re.delta_score AS deltaScore,
+               rc.card_code AS cardCode, rc.count AS cardCount
+        FROM round_entries re
+        INNER JOIN rounds r ON r.id = re.round_id
+        LEFT JOIN round_cards rc ON rc.round_entry_id = re.id
+        WHERE r.game_id = :gameId
+        ORDER BY r.round_number ASC, re.game_player_id ASC
+        """,
+    )
+    fun observeCards(gameId: Long): Flow<List<RoundEntryCard>>
 
     @Insert
     suspend fun insertEntry(entry: RoundEntryEntity): Long

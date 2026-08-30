@@ -39,6 +39,7 @@ import com.counter.game.ui.viewModelFactory
 fun SettingsScreen(
     container: AppContainer,
     onBack: () -> Unit,
+    onOpenRules: () -> Unit,
 ) {
     val vm: SettingsViewModel = viewModel(factory = viewModelFactory(container))
     val state by vm.state.collectAsState()
@@ -76,6 +77,12 @@ fun SettingsScreen(
                 IntField("Номинал короля", state.kingValue, vm::updateKing)
                 IntField("Лимит проигрыша", state.thresholdScore, vm::updateThreshold)
                 FontScaleRow(state.fontScale, vm::updateFontScale)
+
+                Button(
+                    onClick = onOpenRules,
+                    modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                ) { Text("Правила подсчёта →") }
 
                 Button(
                     onClick = {

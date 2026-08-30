@@ -20,4 +20,18 @@ sealed class Routes(val path: String) {
         fun build(gameId: Long) = "game/$gameId/history"
         const val ARG = "gameId"
     }
+
+    data object Rules : Routes("rules")
+
+    data object RuleEdit : Routes("rules/edit?id={id}") {
+        fun build(id: Long?) = if (id == null) "rules/edit?id=-1" else "rules/edit?id=$id"
+        const val ARG = "id"
+    }
+
+    data object Statistics : Routes("statistics")
+
+    data object PlayerDetail : Routes("statistics/player/{playerId}") {
+        fun build(playerId: Long) = "statistics/player/$playerId"
+        const val ARG = "playerId"
+    }
 }

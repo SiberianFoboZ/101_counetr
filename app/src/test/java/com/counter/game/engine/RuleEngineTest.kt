@@ -141,4 +141,62 @@ class RuleEngineTest {
             },
         )
     }
+
+    @Test
+    fun `final adjustment subtracts total when total reaches 101`() {
+        // Per-card правило: 1 шестёрка → +6.
+        val perCard = rule("Базовая: 6", "6", 10, """
+            { "version": 2,
+              "match": { "nominal": {"op":"==","value":6}, "suit":"any" },
+              "then": {"type":"const","value":6},
+              "else": {"type":"const","value":0} }
+        """.trimIndent())
+        // Final-adjustment: если total >= 101 — вычесть total.
+        val finalRule = rule(
+            name = "Обнуление при 101",
+            code = "_final",
+            priority = 200,
+            json = """
+                { "version": 2,
+                  "kind": "final_adjustment",
+                  "match": { "nominal": {"op":"any"}, "suit":"any",
+                             "condition": {"op":">=","left":"total_score","right":{"type":"const","value":101}} },
+                  "then": {"type":"subtract_total"},
+                  "else": {"type":"const","value":0} }
+            """.trimIndent(),
+        )
+        // totalScoreBefore = 100, после +6 от per-card должно быть 106, финал: -106.
+        val ctx = RuleContext(
+            settings = settings,
+            cardDefs = cardDefs,
+            hand = handOf("6" to 1),
+            totalScoreBeforeRound = 100,
+        )
+        val delta = RuleEngine().compute(listOf(perCard, finalRule), ctx)
+        assertEquals(6 + (-106), delta) // = -100
+    }
+
+    @Test
+    fun `final adjustment does nothing when total stays below 101`() {
+        val finalRule = rule(
+            name = "Обнуление при 101",
+            code = "_final",
+            priority = 200,
+            json = """
+                { "version": 2,
+                  "kind": "final_adjustment",
+                  "match": { "nominal": {"op":"any"}, "suit":"any",
+                             "condition": {"op":">=","left":"total_score","right":{"type":"const","value":101}} },
+                  "then": {"type":"subtract_total"},
+                  "else": {"type":"const","value":0} }
+            """.trimIndent(),
+        )
+        val ctx = RuleContext(
+            settings = settings,
+            cardDefs = cardDefs,
+            hand = handOf(),
+            totalScoreBeforeRound = 50,
+        )
+        assertEquals(0, RuleEngine().compute(listOf(finalRule), ctx))
+    }
 }

@@ -52,7 +52,9 @@ class AppContainer private constructor(
                 app.applicationContext,
                 AppDatabase::class.java,
                 "101_counter.db",
-            ).build()
+            )
+                .addMigrations(AppDatabase.MIGRATION_1_2)
+                .build()
 
             val settingsRepo = SettingsRepository(db.settingsDao())
             val playersRepo = PlayersRepository(db.playerDao())
