@@ -1,0 +1,64 @@
+# GitHub Actions workflow для 101 Counter — CI на каждый PR и push в main.
+# Что делает:
+#   1. Поднимает JDK 17
+#   2. Ставит Android SDK 36
+#   3. Запускает юнит-тесты
+#   4. Собирает debug APK
+#   5. Загружает APK как artifact (для ручной проверки)
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Test & Build Debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+        java-version: '17'
+
+      # Android SDK 36 + build-tools + licenses.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 36
+          build-tools-version: '36.0.0'
+          auto-accept-licenses: true
+
+      # Кэширование зависимостей Gradle между ранами.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # ВАЖНО: -Dorg.gradle.java.home=$JAVA_HOME перебивает локальный
+      # Windows-путь из gradle.properties (его нет на Linux-раннере,
+      # Gradle бы упал при старте демона).
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
+
+      - name: Upload debug APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 14

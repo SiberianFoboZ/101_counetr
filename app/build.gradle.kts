@@ -1,8 +1,21 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+
+    // Для подписи release-APK через signingConfigs нужно включить v1 + v2.
+    // signByKeyAliasAndPassword ниже — стандартный Kotlin DSL.
+}
+
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) {
+        load(FileInputStream(f))
+    }
 }
 
 android {
@@ -21,6 +34,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            // Все значения приходят из keystore.properties в корне проекта.
+            // На CI их подставляет workflow release.yml из GitHub Secrets.
+            // Локально этот файл нужно создать самому (см. README → «Сборка release APK»).
+            if (keystoreProperties.isNotEmpty()) {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -28,6 +55,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            // debug-вариант без подписи (использует debug keystore из Android SDK).
+            isMinifyEnabled = false
         }
     }
     compileOptions {

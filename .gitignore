@@ -21,3 +21,10 @@ local.properties
 
 # Сгенерированные Room-схемы (не нужны, пока не появятся миграции).
 /app/schemas/
+
+# Keystore и пароли для подписи release-APK. Эти файлы НИКОГДА не должны попадать в репозиторий.
+# Положи их локально (и в GitHub Secrets на CI) — см. README → «Сборка release APK».
+keystore.properties
+keystore/
+*.jks
+*.keystore
