@@ -92,6 +92,7 @@
 - Keystore НИКОГДА не коммитится — в `.gitignore` (`keystore.properties`, `keystore/`, `*.jks`, `*.keystore`).
 - APK после сборки переименовывается в `101-counter-v<tag>.apk` шагом `Rename APK with version and tag`.
 - Текущая версия приложения: `versionName = "1.0.1"`, `versionCode = 2`. Меняется в `app/build.gradle.kts` перед каждым релизом.
+- Текущие планы — в README.md («Roadmap» внизу файла). В QWEN.md их не дублируем.
 
 ## Известные особенности среды
 
