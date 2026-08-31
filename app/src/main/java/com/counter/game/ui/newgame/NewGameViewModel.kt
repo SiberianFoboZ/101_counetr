@@ -17,6 +17,7 @@ data class NewGameState(
     val isStarting: Boolean = false,
     val startedGameId: Long? = null,
     val errorMessage: String? = null,
+    val infoMessage: String? = null,
 )
 
 class NewGameViewModel(private val container: AppContainer) : ViewModel() {
@@ -35,12 +36,36 @@ class NewGameViewModel(private val container: AppContainer) : ViewModel() {
             isStarting = transient.isStarting,
             startedGameId = transient.startedGameId,
             errorMessage = transient.errorMessage,
+            infoMessage = transient.infoMessage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewGameState())
 
     fun toggle(playerId: Long) {
         val current = selectedFlow.value
         selectedFlow.value = if (playerId in current) current - playerId else current + playerId
+    }
+
+    fun addPlayer() {
+        viewModelScope.launch {
+            try {
+                if (container.playersRepository.countActive() >= 10) {
+                    transientFlow.value = transientFlow.value.copy(
+                        errorMessage = "Достигнут лимит в 10 игроков",
+                    )
+                    return@launch
+                }
+                container.playersRepository.add("")
+                transientFlow.value = transientFlow.value.copy(
+                    infoMessage = "Игрок добавлен",
+                )
+            } catch (t: Throwable) {
+                transientFlow.value = transientFlow.value.copy(errorMessage = t.message)
+            }
+        }
+    }
+
+    fun consumeInfo() {
+        transientFlow.value = transientFlow.value.copy(infoMessage = null)
     }
 
     fun start() {
@@ -84,5 +109,6 @@ class NewGameViewModel(private val container: AppContainer) : ViewModel() {
         val isStarting: Boolean = false,
         val startedGameId: Long? = null,
         val errorMessage: String? = null,
+        val infoMessage: String? = null,
     )
 }

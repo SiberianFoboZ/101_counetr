@@ -4,6 +4,7 @@ sealed class Routes(val path: String) {
     data object Home : Routes("home")
     data object Players : Routes("players")
     data object Settings : Routes("settings")
+    data object Theme : Routes("theme")
     data object NewGame : Routes("new_game")
 
     data object Game : Routes("game/{gameId}") {

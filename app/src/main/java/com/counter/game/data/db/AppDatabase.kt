@@ -34,7 +34,7 @@ import com.counter.game.data.entity.SettingsEntity
         RoundEntryEntity::class,
         RoundCardEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,6 +59,23 @@ abstract class AppDatabase : RoomDatabase() {
                     "INSERT OR IGNORE INTO card_definitions(code, label, base_value, is_face) VALUES (?, ?, ?, ?)",
                     arrayOf("_final", "—", 0, 0),
                 )
+            }
+        }
+
+        /**
+         * v2 → v3: добавляем поля цветовой палитры в `settings`.
+         * Для уже установленных приложений все столбцы получают NULL/дефолт,
+         * что соответствует классической чёрно-белой теме.
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_preset TEXT NOT NULL DEFAULT 'classic'")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_text TEXT")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_background TEXT")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_surface TEXT")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_on_surface TEXT")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_surface_variant TEXT")
+                db.execSQL("ALTER TABLE settings ADD COLUMN theme_token_outline TEXT")
             }
         }
     }

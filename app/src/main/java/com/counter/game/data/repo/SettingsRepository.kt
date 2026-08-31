@@ -15,13 +15,29 @@ class SettingsRepository(private val dao: SettingsDao) {
         thresholdScore: Int,
         fontScale: Float,
     ) {
+        val current = dao.get() ?: SettingsEntity()
         dao.upsert(
-            SettingsEntity(
+            current.copy(
                 queenValue = queenValue,
                 queenSpadesValue = queenSpadesValue,
                 kingValue = kingValue,
                 thresholdScore = thresholdScore,
                 fontScale = fontScale,
+            ),
+        )
+    }
+
+    suspend fun updateTheme(themePreset: String, tokens: Map<String, String>) {
+        val current = dao.get() ?: SettingsEntity()
+        dao.upsert(
+            current.copy(
+                themePreset = themePreset,
+                themeTokenText = tokens["text"],
+                themeTokenBackground = tokens["background"],
+                themeTokenSurface = tokens["surface"],
+                themeTokenOnSurface = tokens["on_surface"],
+                themeTokenSurfaceVariant = tokens["surface_variant"],
+                themeTokenOutline = tokens["outline"],
             ),
         )
     }

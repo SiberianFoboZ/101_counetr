@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import com.counter.game.ui.common.QuickClearTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -113,7 +114,7 @@ fun RuleEditScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 SectionCard(title = "Основное") {
-                    OutlinedTextField(
+                    QuickClearTextField(
                         value = state.form.name,
                         onValueChange = vm::setName,
                         label = { Text("Название правила") },
@@ -342,14 +343,13 @@ private fun NominalSection(state: RuleEditState, vm: RuleEditViewModel) {
             is RuleSerializer.NominalForm.Eq -> IntRow("значение", current.value) { vm.setNominal(current.copy(value = it)) }
             is RuleSerializer.NominalForm.Ne -> IntRow("значение", current.value) { vm.setNominal(current.copy(value = it)) }
             is RuleSerializer.NominalForm.In -> {
-                OutlinedTextField(
+                QuickClearTextField(
                     value = current.values.joinToString(","),
                     onValueChange = { txt ->
                         val parsed = txt.split(",").mapNotNull { it.trim().toIntOrNull() }
                         vm.setNominal(RuleSerializer.NominalForm.In(parsed))
                     },
                     label = { Text("значения через запятую") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -657,7 +657,7 @@ private fun IntRow(label: String, value: Int, onChange: (Int) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
+        QuickClearTextField(
             value = value.toString(),
             onValueChange = { txt ->
                 val cleaned = txt.trim()
@@ -668,7 +668,6 @@ private fun IntRow(label: String, value: Int, onChange: (Int) -> Unit) {
                 }
             },
             label = { Text(label) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             singleLine = true,
             modifier = Modifier.weight(1f),
         )

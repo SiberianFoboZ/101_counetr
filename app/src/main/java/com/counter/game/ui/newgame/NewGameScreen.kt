@@ -2,7 +2,6 @@ package com.counter.game.ui.newgame
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +21,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -30,9 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.counter.game.AppContainer
@@ -47,11 +47,19 @@ fun NewGameScreen(
 ) {
     val vm: NewGameViewModel = viewModel(factory = viewModelFactory(container))
     val state by vm.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.startedGameId) {
         state.startedGameId?.let { id ->
             onGameStarted(id)
             vm.consumeStartedGame()
+        }
+    }
+
+    LaunchedEffect(state.infoMessage) {
+        state.infoMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            vm.consumeInfo()
         }
     }
 
@@ -65,54 +73,93 @@ fun NewGameScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         },
-        floatingActionButton = {},
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { vm.addPlayer() },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Text(" Игрок")
+            }
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(innerPadding), color = MaterialTheme.colorScheme.background) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Выберите от 2 до 10 игроков", color = Color.Black)
-                Text("Выбрано: ${state.selectedIds.size}", color = Color(0xFF666666))
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        items(state.players, key = { it.id }) { p ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { vm.toggle(p.id) }
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = p.id in state.selectedIds,
-                                    onCheckedChange = { vm.toggle(p.id) },
-                                )
-                                Text(p.name, color = Color.Black)
-                            }
-                        }
-                    }
-                }
-                state.errorMessage?.let { msg ->
-                    Text(msg, color = Color.Red, modifier = Modifier.padding(vertical = 8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Выберите от 2 до 10 игроков",
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        "Выбрано: ${state.selectedIds.size}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 Button(
                     onClick = vm::start,
                     enabled = !state.isStarting,
-                    modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
+                    modifier = Modifier.sizeIn(minHeight = 48.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White,
-                        disabledContainerColor = Color(0xFFBDBDBD),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
                 ) {
                     Text(if (state.isStarting) "Старт…" else "Старт")
+                }
+            }
+            state.errorMessage?.let { msg ->
+                Text(
+                    msg,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+            if (state.players.isEmpty()) {
+                Text(
+                    "Нет ни одного игрока. Нажмите «+ Игрок», чтобы добавить.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(state.players, key = { it.id }) { p ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.toggle(p.id) }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = p.id in state.selectedIds,
+                                onCheckedChange = { vm.toggle(p.id) },
+                            )
+                            Text(p.name, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
                 }
             }
         }

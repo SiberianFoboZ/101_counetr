@@ -44,9 +44,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -114,6 +114,10 @@ fun RoundInputScreen(
     val state by vm.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var expandedPlayerId by remember { mutableStateOf<Long?>(null) }
+    // По умолчанию блок «Кто выиграл раунд?» развёрнут, чтобы пользователь сразу
+    // мог выбрать победителя. После выбора — сворачивается в компактную строку,
+    // освобождая максимум места для карт проигравших.
+    var winnerSectionExpanded by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(gameId) { vm.load(gameId) }
     LaunchedEffect(state.savedRoundNumber) {
@@ -153,8 +157,9 @@ fun RoundInputScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         },
@@ -166,20 +171,15 @@ fun RoundInputScreen(
             color = MaterialTheme.colorScheme.background,
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                SectionHeader(stepNumber = 1, title = "Кто выиграл раунд?")
-                WinnerStrip(
+                WinnerSelectionSection(
                     players = state.players,
                     selectedId = state.winnerGamePlayerId,
-                    onSelect = vm::selectWinner,
+                    winnerDelta = state.winnerDelta,
+                    expanded = winnerSectionExpanded,
+                    onToggleExpand = { winnerSectionExpanded = !winnerSectionExpanded },
+                    onSelectWinner = vm::selectWinner,
+                    onSelectDelta = vm::setWinnerDelta,
                 )
-
-                // Плашки бонуса победителю. Видны только если победитель выбран.
-                if (state.winnerGamePlayerId != null) {
-                    WinnerDeltaRow(
-                        current = state.winnerDelta,
-                        onSelect = vm::setWinnerDelta,
-                    )
-                }
 
                 SectionHeader(
                     stepNumber = 2,
@@ -217,9 +217,9 @@ fun RoundInputScreen(
                         enabled = canSave,
                         modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 56.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Black,
-                            contentColor = Color.White,
-                            disabledContainerColor = Color(0xFFBDBDBD),
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         ),
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
@@ -241,19 +241,19 @@ private fun SectionHeader(stepNumber: Int, title: String, subtitle: String? = nu
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF5F5F5))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(Color.Black, RoundedCornerShape(50)),
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     stepNumber.toString(),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -261,7 +261,7 @@ private fun SectionHeader(stepNumber: Int, title: String, subtitle: String? = nu
             Spacer(Modifier.size(10.dp))
             Text(
                 title,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -270,7 +270,7 @@ private fun SectionHeader(stepNumber: Int, title: String, subtitle: String? = nu
             Spacer(Modifier.size(4.dp))
             Text(
                 subtitle,
-                color = Color(0xFF666666),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(start = 38.dp),
             )
@@ -278,13 +278,108 @@ private fun SectionHeader(stepNumber: Int, title: String, subtitle: String? = nu
     }
 }
 
+/**
+ * Сворачиваемый блок выбора победителя и его бонуса.
+ *
+ * Развёрнут по умолчанию — пользователь сразу видит сетку игроков.
+ * После выбора победителя схлопывается в одну строку «Победитель: X · бонус Y»,
+ * максимально освобождая место для карт проигравших. По тапу — раскрывается
+ * обратно, чтобы можно было поменять победителя или скорректировать бонус.
+ */
 @Composable
-private fun WinnerStrip(
+private fun WinnerSelectionSection(
+    players: List<GamePlayerWithScore>,
+    selectedId: Long?,
+    winnerDelta: Int,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onSelectWinner: (Long) -> Unit,
+    onSelectDelta: (Int) -> Unit,
+) {
+    val selectedPlayer = players.firstOrNull { it.id == selectedId }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        // Заголовок-шеврон: либо приглашение выбрать, либо компактная сводка.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpand)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "1",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Spacer(Modifier.size(10.dp))
+            if (selectedPlayer == null) {
+                Text(
+                    "Кто выиграл раунд?",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Победитель",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        selectedPlayer.displayName + " · " + if (winnerDelta == 0) "бонус 0" else "бонус $winnerDelta",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Свернуть" else "Развернуть",
+                tint = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                WinnerGrid(
+                    players = players,
+                    selectedId = selectedId,
+                    onSelect = onSelectWinner,
+                )
+
+                if (selectedId != null) {
+                    WinnerDeltaRow(
+                        current = winnerDelta,
+                        onSelect = onSelectDelta,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WinnerGrid(
     players: List<GamePlayerWithScore>,
     selectedId: Long?,
     onSelect: (Long) -> Unit,
 ) {
-    // Сетка 2 колонки, чтобы карточки были достаточно широкими при большом числе игроков.
     val rows = players.chunked(2)
     Column(
         modifier = Modifier
@@ -306,7 +401,6 @@ private fun WinnerStrip(
                     )
                 }
                 if (rowPair.size == 1) {
-                    // Добиваем пустым спейсером, чтобы вторая колонка оставалась выровненной.
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
@@ -328,7 +422,7 @@ private fun WinnerDeltaRow(
     ) {
         Text(
             "Бонус победителю (по умолчанию 0):",
-            color = Color(0xFF666666),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
         )
         Row(
@@ -341,12 +435,12 @@ private fun WinnerDeltaRow(
                     modifier = Modifier
                         .weight(1f)
                         .background(
-                            if (isSelected) Color.Black else Color.White,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             RoundedCornerShape(8.dp),
                         )
                         .border(
                             width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) Color.Black else Color(0xFFCCCCCC),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             shape = RoundedCornerShape(8.dp),
                         )
                         .clickable { onSelect(v) }
@@ -355,7 +449,7 @@ private fun WinnerDeltaRow(
                 ) {
                     Text(
                         if (v == 0) "0" else v.toString(),
-                        color = if (isSelected) Color.White else Color.Black,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     )
@@ -371,7 +465,7 @@ private fun WinnerDeltaRow(
         }
         Text(
             hint,
-            color = Color(0xFF888888),
+            color = MaterialTheme.colorScheme.outline,
             fontSize = 12.sp,
         )
     }
@@ -387,12 +481,12 @@ private fun WinnerCard(
     Row(
         modifier = modifier
             .background(
-                if (isSelected) Color.Black else Color.White,
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(8.dp),
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) Color.Black else Color(0xFFCCCCCC),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                 shape = RoundedCornerShape(8.dp),
             )
             .clickable(onClick = onClick)
@@ -402,14 +496,14 @@ private fun WinnerCard(
     ) {
         Text(
             player.displayName,
-            color = if (isSelected) Color.White else Color.Black,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
             fontSize = 16.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
         )
         Text(
             player.totalScore.toString(),
-            color = if (isSelected) Color.White else Color(0xFF666666),
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp,
         )
     }
@@ -433,10 +527,10 @@ private fun PlayerCard(
             .fillMaxWidth()
             .border(
                 width = if (expanded) 2.dp else 1.dp,
-                color = if (expanded) Color.Black else Color(0xFFCCCCCC),
+                color = if (expanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                 shape = RoundedCornerShape(8.dp),
             )
-            .background(Color.White, RoundedCornerShape(8.dp)),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp)),
     ) {
         Row(
             modifier = Modifier
@@ -449,20 +543,20 @@ private fun PlayerCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     player.displayName,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     "Карт: $totalCards" + if (previewDelta != 0) " · итого ${if (previewDelta > 0) "+" else ""}$previewDelta" else "",
-                    color = Color(0xFF666666),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                 )
             }
             Icon(
                 if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = if (expanded) "Свернуть" else "Развернуть",
-                tint = Color.Black,
+                tint = MaterialTheme.colorScheme.onBackground,
             )
         }
 
@@ -505,7 +599,7 @@ private fun BasicCardsGrid(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             "Карты на руках",
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(vertical = 4.dp),
@@ -547,7 +641,7 @@ private fun FaceCardRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             label,
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(vertical = 4.dp),
@@ -555,7 +649,7 @@ private fun FaceCardRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFFAFAFA), RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -569,11 +663,11 @@ private fun FaceCardRow(
                     },
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(Icons.Default.Remove, contentDescription = "Убрать", tint = Color.Black)
+                    Icon(Icons.Default.Remove, contentDescription = "Убрать", tint = MaterialTheme.colorScheme.onBackground)
                 }
                 Text(
                     sum.toString(),
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 12.dp),
@@ -585,7 +679,7 @@ private fun FaceCardRow(
                     },
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Добавить", tint = Color.Black)
+                    Icon(Icons.Default.Add, contentDescription = "Добавить", tint = MaterialTheme.colorScheme.onBackground)
                 }
             }
             val preview = previewDelta(
@@ -594,7 +688,7 @@ private fun FaceCardRow(
             )
             Text(
                 if (preview == 0) "0" else "${if (preview > 0) "+" else ""}$preview",
-                color = Color(0xFF666666),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -613,10 +707,10 @@ private fun CounterChip(
     Row(
         modifier = modifier
             .background(
-                if (value > 0) Color(0xFFE8E8E8) else Color.White,
+                if (value > 0) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(8.dp),
             )
-            .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -628,7 +722,7 @@ private fun CounterChip(
             Icon(
                 Icons.Default.Remove,
                 contentDescription = null,
-                tint = if (value > 0) Color.Black else Color(0xFFCCCCCC),
+                tint = if (value > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.outline,
             )
         }
         Column(
@@ -637,13 +731,13 @@ private fun CounterChip(
         ) {
             Text(
                 label,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 value.toString(),
-                color = if (value > 0) Color.Black else Color(0xFF999999),
+                color = if (value > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.outline,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -652,7 +746,7 @@ private fun CounterChip(
             onClick = onIncrement,
             modifier = Modifier.size(36.dp),
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
+            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
         }
     }
 }

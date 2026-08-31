@@ -53,16 +53,17 @@ fun PlayersScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = vm::add,
-                containerColor = Color.Black,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Text(" Игрок")
@@ -86,7 +87,7 @@ fun PlayersScreen(
                             modifier = Modifier.weight(1f),
                         )
                         IconButton(onClick = { vm.startArchive(player) }) {
-                            Icon(Icons.Default.Archive, contentDescription = "Архивировать", tint = Color.Black)
+                            Icon(Icons.Default.Archive, contentDescription = "Архивировать", tint = MaterialTheme.colorScheme.onBackground)
                         }
                     }
                 }

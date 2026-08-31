@@ -15,7 +15,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.counter.game.ui.common.QuickClearTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -26,10 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.counter.game.AppContainer
 import com.counter.game.ui.viewModelFactory
@@ -40,6 +37,7 @@ fun SettingsScreen(
     container: AppContainer,
     onBack: () -> Unit,
     onOpenRules: () -> Unit,
+    onOpenTheme: () -> Unit,
 ) {
     val vm: SettingsViewModel = viewModel(factory = viewModelFactory(container))
     val state by vm.state.collectAsState()
@@ -54,8 +52,9 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         },
@@ -72,17 +71,20 @@ fun SettingsScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                IntField("Номинал дамы", state.queenValue, vm::updateQueen)
-                IntField("Номинал дамы пик", state.queenSpadesValue, vm::updateQueenSpades)
-                IntField("Номинал короля", state.kingValue, vm::updateKing)
                 IntField("Лимит проигрыша", state.thresholdScore, vm::updateThreshold)
                 FontScaleRow(state.fontScale, vm::updateFontScale)
 
                 Button(
                     onClick = onOpenRules,
                     modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
                 ) { Text("Правила подсчёта →") }
+
+                Button(
+                    onClick = onOpenTheme,
+                    modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                ) { Text("Тема →") }
 
                 Button(
                     onClick = {
@@ -90,7 +92,7 @@ fun SettingsScreen(
                         onBack()
                     },
                     modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                 ) {
                     Text("Сохранить")
                 }
@@ -102,13 +104,12 @@ fun SettingsScreen(
 @Composable
 private fun IntField(label: String, value: Int, onChange: (Int) -> Unit) {
     Column {
-        Text(label, color = Color.Black)
-        OutlinedTextField(
+        Text(label, color = MaterialTheme.colorScheme.onBackground)
+        QuickClearTextField(
             value = value.toString(),
             onValueChange = { txt -> txt.toIntOrNull()?.let(onChange) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
     }
 }
@@ -116,7 +117,7 @@ private fun IntField(label: String, value: Int, onChange: (Int) -> Unit) {
 @Composable
 private fun FontScaleRow(scale: Float, onChange: (Float) -> Unit) {
     Column {
-        Text("Размер шрифта: ${"%.2f".format(scale)}×", color = Color.Black)
+        Text("Размер шрифта: ${"%.2f".format(scale)}×", color = MaterialTheme.colorScheme.onBackground)
         Slider(value = scale, onValueChange = onChange, valueRange = 0.85f..1.5f, steps = 13)
     }
 }

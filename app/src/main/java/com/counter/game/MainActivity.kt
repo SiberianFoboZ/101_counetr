@@ -26,8 +26,13 @@ import com.counter.game.ui.round.RoundInputScreen
 import com.counter.game.ui.rules.RuleEditScreen
 import com.counter.game.ui.rules.RulesScreen
 import com.counter.game.ui.settings.SettingsScreen
+import com.counter.game.ui.settings.ThemeScreen
 import com.counter.game.ui.statistics.StatisticsScreen
 import com.counter.game.ui.theme.MyApplicationTheme
+import com.counter.game.ui.theme.ThemePalette
+import com.counter.game.ui.theme.ThemePreset
+import com.counter.game.ui.theme.parseHexColor
+import com.counter.game.ui.theme.presetColors
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,7 +43,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by fontScaleFlow.collectAsState(initial = null)
             val scale = settings?.fontScale ?: 1.0f
-            MyApplicationTheme(fontScale = scale) {
+            val preset = ThemePreset.fromId(settings?.themePreset)
+            val palette = if (preset == ThemePreset.CUSTOM) {
+                val fallback = presetColors(ThemePreset.CLASSIC)
+                ThemePalette(
+                    preset = ThemePreset.CUSTOM,
+                    customTokens = mapOf(
+                        com.counter.game.ui.theme.ThemeToken.TEXT to parseHexColor(settings?.themeTokenText, fallback[com.counter.game.ui.theme.ThemeToken.TEXT]!!),
+                        com.counter.game.ui.theme.ThemeToken.BACKGROUND to parseHexColor(settings?.themeTokenBackground, fallback[com.counter.game.ui.theme.ThemeToken.BACKGROUND]!!),
+                        com.counter.game.ui.theme.ThemeToken.SURFACE to parseHexColor(settings?.themeTokenSurface, fallback[com.counter.game.ui.theme.ThemeToken.SURFACE]!!),
+                        com.counter.game.ui.theme.ThemeToken.ON_SURFACE to parseHexColor(settings?.themeTokenOnSurface, fallback[com.counter.game.ui.theme.ThemeToken.ON_SURFACE]!!),
+                        com.counter.game.ui.theme.ThemeToken.SURFACE_VARIANT to parseHexColor(settings?.themeTokenSurfaceVariant, fallback[com.counter.game.ui.theme.ThemeToken.SURFACE_VARIANT]!!),
+                        com.counter.game.ui.theme.ThemeToken.OUTLINE to parseHexColor(settings?.themeTokenOutline, fallback[com.counter.game.ui.theme.ThemeToken.OUTLINE]!!),
+                    ),
+                )
+            } else {
+                ThemePalette(preset = preset)
+            }
+            MyApplicationTheme(palette = palette, fontScale = scale) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -76,6 +98,13 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
                 container = container,
                 onBack = { navController.popBackStack() },
                 onOpenRules = { navController.navigate(Routes.Rules.path) },
+                onOpenTheme = { navController.navigate(Routes.Theme.path) },
+            )
+        }
+        composable(Routes.Theme.path) {
+            ThemeScreen(
+                container = container,
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.Rules.path) {
