@@ -1,30 +1,41 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <!--
+      Adaptive icon safe zone: 66dp центральная часть (viewport 21..87 от центра 54,54).
+      Все важные элементы размещаем в этой зоне.
+    -->
+
+    <!-- Большая стилизованная пика по центру (белый path). -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,26
+                          C 51,30 47,34 43,38
+                          C 39,42 35,46 33,52
+                          C 31,58 33,65 39,69
+                          C 44,72 50,71 54,68
+                          C 54,72 53,76 51,80
+                          L 47,80
+                          L 47,84
+                          L 53,84
+                          L 53,82
+                          L 55,82
+                          L 55,84
+                          L 61,84
+                          L 61,80
+                          L 57,80
+                          C 55,76 54,72 54,68
+                          C 58,71 64,72 69,69
+                          C 75,65 77,58 75,52
+                          C 73,46 69,42 65,38
+                          C 61,34 57,30 54,26 Z" />
+
+    <!-- Цифры «101» под пикой. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32,90 L32,93 L30,93 L30,95 L32,95 L32,97 L34,97 L34,95 L36,95 L36,93 L34,93 L34,90 Z
+                          M42,90 L42,97 L44,97 L44,93 L46,93 C 47,93 47.5,93.5 47.5,94.5 L47.5,97 L49.5,97 L49.5,94.5 C 49.5,92.5 48.5,90 46,90 Z
+                          M55,90 L55,93 L53,93 L53,95 L55,95 L55,97 L57,97 L57,95 L59,95 L59,93 L57,93 L57,90 Z" />
 </vector>
