@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,7 +17,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -80,16 +80,6 @@ fun NewGameScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { vm.addPlayer() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text(" Игрок")
-            }
-        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Column(
@@ -114,17 +104,15 @@ fun NewGameScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Button(
-                    onClick = vm::start,
-                    enabled = !state.isStarting,
-                    modifier = Modifier.sizeIn(minHeight = 48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                IconButton(
+                    onClick = { vm.addPlayer() },
+                    modifier = Modifier.size(48.dp),
                 ) {
-                    Text(if (state.isStarting) "Старт…" else "Старт")
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Добавить игрока",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
             state.errorMessage?.let { msg ->
@@ -136,7 +124,7 @@ fun NewGameScreen(
             }
             if (state.players.isEmpty()) {
                 Text(
-                    "Нет ни одного игрока. Нажмите «+ Игрок», чтобы добавить.",
+                    "Нет ни одного игрока. Нажмите «+», чтобы добавить.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 24.dp),
                 )
@@ -160,6 +148,21 @@ fun NewGameScreen(
                             Text(p.name, color = MaterialTheme.colorScheme.onBackground)
                         }
                     }
+                }
+                Button(
+                    onClick = vm::start,
+                    enabled = !state.isStarting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .sizeIn(minHeight = 56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) {
+                    Text(if (state.isStarting) "Старт…" else "Старт")
                 }
             }
         }

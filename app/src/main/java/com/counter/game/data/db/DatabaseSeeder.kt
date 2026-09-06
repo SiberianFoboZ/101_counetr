@@ -84,24 +84,22 @@ object DatabaseSeeder {
 
         private const val BASE_VALUE = """{"type":"base_value"}"""
         private const val SETTING_QUEEN = """{"type":"setting","key":"queen_value"}"""
-        private const val CONST_25 = """{"type":"const","value":25}"""
+        private const val CONST_40 = """{"type":"const","value":40}"""
+        private const val CONST_50 = """{"type":"const","value":50}"""
+        private const val CONST_NEG_101 = """{"type":"const","value":-101}"""
 
         val rows: List<Row> = listOf(
             Row(
-                name = "Король пик",
-                appliesToCard = "K_spades",
-                priority = 100,
+                name = "Дама",
+                appliesToCard = "Q_hearts",
+                priority = 50,
                 enabled = true,
                 definitionJson = """
                 {
                   "version": 2,
-                  "match": {
-                    "nominal": {"op":"==","value":4},
-                    "suit": "spades",
-                    "condition": {"op":">=","left":"card_count","right":{"type":"const","value":2}}
-                  },
-                  "then": {"type":"const","value":50},
-                  "else": {"type":"const","value":4}
+                  "match": {"nominal":{"op":"any"},"suit":"non_spades"},
+                  "then": $BASE_VALUE,
+                  "else": $BASE_VALUE
                 }
                 """.trimIndent(),
             ),
@@ -113,23 +111,45 @@ object DatabaseSeeder {
                 definitionJson = """
                 {
                   "version": 2,
-                  "match": {"nominal":{"op":"any"},"suit":"spades"},
-                  "then": $CONST_25,
-                  "else": $CONST_25
+                  "match": {
+                    "nominal": {"op":"any"},
+                    "suit": "spades",
+                    "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}}
+                  },
+                  "then": $CONST_40,
+                  "else": $BASE_VALUE
                 }
                 """.trimIndent(),
             ),
             Row(
-                name = "Дама",
-                appliesToCard = "Q_hearts",
-                priority = 50,
+                name = "Король",
+                appliesToCard = "K_hearts",
+                priority = 30,
                 enabled = true,
                 definitionJson = """
                 {
                   "version": 2,
                   "match": {"nominal":{"op":"any"},"suit":"non_spades"},
-                  "then": $SETTING_QUEEN,
-                  "else": $SETTING_QUEEN
+                  "then": $BASE_VALUE,
+                  "else": $BASE_VALUE
+                }
+                """.trimIndent(),
+            ),
+            Row(
+                name = "Король пик",
+                appliesToCard = "K_spades",
+                priority = 95,
+                enabled = true,
+                definitionJson = """
+                {
+                  "version": 2,
+                  "match": {
+                    "nominal": {"op":"any"},
+                    "suit": "spades",
+                    "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}}
+                  },
+                  "then": $CONST_50,
+                  "else": $BASE_VALUE
                 }
                 """.trimIndent(),
             ),
@@ -160,6 +180,25 @@ object DatabaseSeeder {
             Row(
                 name = "Базовая: Туз", appliesToCard = "A", priority = 10, enabled = true,
                 definitionJson = baseRuleJson(),
+            ),
+            Row(
+                name = "Обнуление при 101",
+                appliesToCard = "_final",
+                priority = 1000,
+                enabled = true,
+                definitionJson = """
+                {
+                  "version": 2,
+                  "kind": "final_adjustment",
+                  "match": {
+                    "nominal": {"op":"any"},
+                    "suit": "any",
+                    "condition": {"op":"==","left":"total_score","right":{"type":"const","value":101}}
+                  },
+                  "then": $CONST_NEG_101,
+                  "else": $BASE_VALUE
+                }
+                """.trimIndent(),
             ),
         )
 

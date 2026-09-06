@@ -35,61 +35,97 @@ class RuleEngineTest {
     )
 
     @Test
-    fun `king of spades with single card costs 4`() {
-        val rules = listOf(
-            rule("Король пик", "K_spades", 100, """
-                { "version": 2,
-                  "match": { "nominal": {"op":"==","value":4}, "suit":"spades",
-                             "condition": {"op":">=","left":"card_count","right":{"type":"const","value":2}} },
-                  "then": {"type":"const","value":50},
-                  "else": {"type":"const","value":4} }
-            """.trimIndent()),
-        )
-        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("K_spades" to 1))
-        assertEquals(4, RuleEngine().compute(rules, ctx))
-    }
-
-    @Test
-    fun `king of spades with 3 cards costs 50`() {
+    fun `king of spades as only card in hand costs 50`() {
+        // «Единственная карта в руке» = distinct_card_codes == 1.
         val rules = listOf(
             rule("Король пик", "K_spades", 100, """
                 { "version": 2,
                   "match": { "nominal": {"op":"any"}, "suit":"spades",
-                             "condition": {"op":">=","left":"card_count","right":{"type":"const","value":2}} },
+                             "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}} },
                   "then": {"type":"const","value":50},
-                  "else": {"type":"const","value":4} }
+                  "else": {"type":"base_value"} }
             """.trimIndent()),
         )
-        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("K_spades" to 3))
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("K_spades" to 1))
         assertEquals(50, RuleEngine().compute(rules, ctx))
     }
 
     @Test
-    fun `queen of spades always 25`() {
+    fun `king of spades alongside other cards costs base value`() {
+        // Несколько разных карт → distinct_card_codes > 1 → base_value (=4).
         val rules = listOf(
-            rule("Дама пик", "Q_spades", 90, """
+            rule("Король пик", "K_spades", 100, """
                 { "version": 2,
-                  "match": { "nominal": {"op":"any"}, "suit":"spades" },
-                  "then": {"type":"const","value":25},
-                  "else": {"type":"const","value":25} }
+                  "match": { "nominal": {"op":"any"}, "suit":"spades",
+                             "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}} },
+                  "then": {"type":"const","value":50},
+                  "else": {"type":"base_value"} }
             """.trimIndent()),
         )
-        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_spades" to 2))
-        assertEquals(25, RuleEngine().compute(rules, ctx))
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("K_spades" to 1, "J" to 1))
+        assertEquals(4, RuleEngine().compute(rules, ctx))
     }
 
     @Test
-    fun `queen of hearts uses queenValue`() {
+    fun `queen of spades as only card in hand costs 40`() {
+        val rules = listOf(
+            rule("Дама пик", "Q_spades", 90, """
+                { "version": 2,
+                  "match": { "nominal": {"op":"any"}, "suit":"spades",
+                             "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}} },
+                  "then": {"type":"const","value":40},
+                  "else": {"type":"base_value"} }
+            """.trimIndent()),
+        )
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_spades" to 1))
+        assertEquals(40, RuleEngine().compute(rules, ctx))
+    }
+
+    @Test
+    fun `queen of spades alongside other cards costs base value`() {
+        val rules = listOf(
+            rule("Дама пик", "Q_spades", 90, """
+                { "version": 2,
+                  "match": { "nominal": {"op":"any"}, "suit":"spades",
+                             "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}} },
+                  "then": {"type":"const","value":40},
+                  "else": {"type":"base_value"} }
+            """.trimIndent()),
+        )
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_spades" to 1, "J" to 1))
+        assertEquals(3, RuleEngine().compute(rules, ctx))
+    }
+
+    @Test
+    fun `queen of hearts scales with card count`() {
+        // Базовая дама = base_value * card_count.
         val rules = listOf(
             rule("Дама", "Q_hearts", 50, """
                 { "version": 2,
                   "match": { "nominal": {"op":"any"}, "suit":"non_spades" },
-                  "then": {"type":"setting","key":"queen_value"},
-                  "else": {"type":"setting","key":"queen_value"} }
+                  "then": {"type":"base_value"},
+                  "else": {"type":"base_value"} }
             """.trimIndent()),
         )
-        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_hearts" to 1))
-        assertEquals(3, RuleEngine().compute(rules, ctx))
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_hearts" to 3))
+        assertEquals(9, RuleEngine().compute(rules, ctx))
+    }
+
+    @Test
+    fun `queen of spades with two of them costs 40`() {
+        // Q_spades × 2 в руке без других карт → distinct_card_codes == 1 → +40.
+        // «Единственная карта в руке» = единственный уникальный код.
+        val rules = listOf(
+            rule("Дама пик", "Q_spades", 90, """
+                { "version": 2,
+                  "match": { "nominal": {"op":"any"}, "suit":"spades",
+                             "condition": {"op":"==","left":"distinct_card_codes","right":{"type":"const","value":1}} },
+                  "then": {"type":"const","value":40},
+                  "else": {"type":"base_value"} }
+            """.trimIndent()),
+        )
+        val ctx = RuleContext(settings = settings, cardDefs = cardDefs, hand = handOf("Q_spades" to 2))
+        assertEquals(40, RuleEngine().compute(rules, ctx))
     }
 
     @Test
