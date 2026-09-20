@@ -40,6 +40,8 @@
 - **Сидинг:** через `SupportSQLiteDatabase.execSQL` из `DatabaseSeeder.seed(handle)`. Дёргается явно в `AppContainer.seedIfNeeded()` при `count == 0`.
 - **WIN:** реактивно. `GameScreen` подписан на `Flow<GameEntity>`; когда `status == FINISHED && winnerPlayerId != null` → `WinnerDialog`.
 - **Long-press** — через `pointerInput.detectTapGestures` в `LongPressTextRow`. Не использовать `combinedClickable`, он плохо ложится на `Row` с весом.
+- **Режимы ввода раунда:** `RoundInputViewModel.InputMode { CARDS, MANUAL }`. Переключатель `SingleChoiceSegmentedButtonRow` в `RoundInputScreen` над списком проигравших. В `MANUAL` движок правил не вызывается, `round_cards` не пишутся, `delta_score` берётся из `RoundInput.manualDelta: Map<Long, Int>?` напрямую; в `raw_input_json` пишется `{"mode":"manual","delta":N}`. При смене режима уже введённые данные другой корзины сбрасываются.
+- **Snackbar между экранами:** «Раунд N сохранён» показывается на `GameScreen`, не на `RoundInputScreen`. `RoundInputScreen` кладёт номер в `navBackStackEntry.savedStateHandle["saved_round_number"]` и сразу зовёт `onSaved()` (навигация `popBackStack()`). Snackbar по `limitMessage` (превышение лимита карт) живёт на `RoundInputScreen` — мгновенный фидбек, не блокирует навигацию. **Не звонить `showSnackbar` синхронно перед `onSaved()`** — `SnackbarHostState.showSnackbar` suspend-функция с дефолтным `SnackbarDuration.Short` ≈ 4 сек, навигация отложится.
 
 ## Стиль кода
 
@@ -73,16 +75,19 @@
 Полная версия — в `.qwen/plans/925c7d80-b6a4-475a-99c7-ff8472c1c3cd.md` (план реализации).
 `task.md` (ТЗ) и `TODO.md` (roadmap) в `.gitignore` — это рабочие файлы, в репозиторий не входят.
 
-Краткий статус (на тег v1.0.1):
+Краткий статус (на тег v1.1.2):
 
 - ✅ **MVP** — собран и работает: главное меню → игроки → новая игра → раунд → история → правила.
 - ✅ **v1.0.0** — правила (визуальный редактор), статистика (игры + игроки, детальный экран), итоговая корректировка (FINAL_ADJUSTMENT), CardLimits, миграция БД v1→v2.
-- ✅ **v1.0.1** — bump версии (versionCode 1 → 2, versionName 1.0 → 1.0.1), фикс CI/CD (переименование APK по маске `101-counter-v<tag>.apk`).
-- ⬜ **v1.1+** — backlogs из `TODO.md`:
+- ✅ **v1.0.1** — bump версии, фикс CI/CD (переименование APK по маске `101-counter-v<tag>.apk`).
+- ✅ **v1.1.0** — иконка приложения (чёрный фон + пика + «101»).
+- ✅ **v1.1.1** — иконка-сетка (сердечко с градиентом).
+- ✅ **v1.1.2** — фикс правил (дефолты дам/королей, обнуление при 101), ручной ввод дельты в раунде (`InputMode.MANUAL`) для большого числа игроков, мгновенный возврат из раунда через `savedStateHandle`.
+- ⬜ **v1.2+** — backlogs из `TODO.md`:
   - Распознавание карт через камеру (CameraX + ML Kit).
   - Спец-правила (бонус за единственного короля/даму и т.п.).
   - Удаление/архивирование игроков через swipe (сейчас — иконка-кнопка).
-  - Улучшение UI ввода (текущая разбивка раунда на 2 экрана vs wizard).
+  - Перевод UI ввода раунда в wizard (сейчас — segmented CARDS/MANUAL + LazyColumn).
 
 ## CI/CD
 
