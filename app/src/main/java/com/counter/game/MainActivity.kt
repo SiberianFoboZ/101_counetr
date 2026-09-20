@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -149,6 +150,7 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
             GameScreen(
                 container = container,
                 gameId = id,
+                navBackStackEntry = entry,
                 onBack = { navController.popBackStack(Routes.Home.path, inclusive = false) },
                 onRound = { gid -> navController.navigate(Routes.RoundInput.build(gid)) },
                 onHistory = { gid -> navController.navigate(Routes.History.build(gid)) },
@@ -162,8 +164,12 @@ private fun CounterNavHost(container: com.counter.game.AppContainer) {
             RoundInputScreen(
                 container = container,
                 gameId = id,
+                // Навигация назад — сразу после сохранения. Snackbar перенесён на GameScreen
+                // (через savedStateHandle этого entry, который читает GameScreen), иначе
+                // SnackbarHostState.showSnackbar приостанавливал навигацию на ~4 секунды.
                 onSaved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
+                navBackStackEntry = entry,
             )
         }
         composable(

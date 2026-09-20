@@ -20,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,9 +44,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import com.counter.game.AppContainer
 import com.counter.game.ui.common.WinnerDialog
 import com.counter.game.ui.viewModelFactory
+
+private const val KEY_SAVED_ROUND = "saved_round_number"
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -54,12 +59,27 @@ fun GameScreen(
     onBack: () -> Unit,
     onRound: (Long) -> Unit,
     onHistory: (Long) -> Unit,
+    navBackStackEntry: NavBackStackEntry? = null,
 ) {
     val vm: GameViewModel = viewModel(factory = viewModelFactory(container))
     val state by vm.state.collectAsState()
     var winnerShown by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(gameId) { vm.load(gameId) }
+
+    // Подхватываем результат «Раунд N сохранён», который кладёт RoundInputScreen в
+    // savedStateHandle предыдущего backstack entry. Показываем snackbar здесь — иначе
+    // пришлось бы блокировать навигацию на ~4 секунды внутри RoundInputScreen.
+    LaunchedEffect(navBackStackEntry) {
+        val handle = navBackStackEntry?.savedStateHandle ?: return@LaunchedEffect
+        handle.getStateFlow<Int?>(KEY_SAVED_ROUND, null).collect { n ->
+            if (n != null) {
+                snackbarHostState.showSnackbar("Раунд $n сохранён")
+                handle[KEY_SAVED_ROUND] = null
+            }
+        }
+    }
 
     // Автопауза: если экран уходит в фон (нажали back, свернули приложение, нажали «Домой»),
     // и игра при этом IN_PROGRESS — переводим в PAUSED. При повторном открытии юзер увидит
@@ -98,6 +118,7 @@ fun GameScreen(
                 ),
             )
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize().padding(innerPadding), color = MaterialTheme.colorScheme.background) {
