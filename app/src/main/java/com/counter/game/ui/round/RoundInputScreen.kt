@@ -197,7 +197,6 @@ fun RoundInputScreen(
                 SectionHeader(
                     stepNumber = 2,
                     title = "Карты у проигравших",
-                    subtitle = if (!hasWinner) "Можно начать без победителя — штраф 0 никому не начислится" else null,
                 )
 
                 InputModeSwitcher(
@@ -489,18 +488,7 @@ private fun WinnerDeltaRow(
                 }
             }
         }
-        // Пояснение, что меняется в лимитах при выбранной плашке.
-        val hint = when (current) {
-            -20 -> "При −20 уменьшается общий пул дам: было 4, станет 3. У одного игрока максимум 2 дамы (любой масти)."
-            -40 -> "При −40 другим игрокам нельзя добавить даму пик."
-            -50 -> "При −50 другим игрокам нельзя добавить короля пик."
-            else -> "Без бонуса — лимиты карт стандартные."
-        }
-        Text(
-            hint,
-            color = MaterialTheme.colorScheme.outline,
-            fontSize = 12.sp,
-        )
+
     }
 }
 
@@ -841,12 +829,7 @@ private fun InputModeSwitcher(
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
             ) { Text("Вручную") }
         }
-        Text(
-            if (mode == InputMode.CARDS) "Движок правил считает" else "Без правил — вводите итог",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp),
-        )
+
     }
 }
 

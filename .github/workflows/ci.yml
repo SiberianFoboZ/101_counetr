@@ -1,10 +1,4 @@
-# GitHub Actions workflow для 101 Counter — CI на каждый PR и push в main.
-# Что делает:
-#   1. Поднимает JDK 17
-#   2. Ставит Android SDK 36
-#   3. Запускает юнит-тесты
-#   4. Собирает debug APK
-#   5. Загружает APK как artifact (для ручной проверки)
+# CI: на каждый PR/push в main — тесты + debug APK.
 name: CI
 
 on:
@@ -29,10 +23,6 @@ jobs:
           distribution: temurin
         java-version: '17'
 
-      # Android SDK 37 + build-tools + licenses.
-      # android-actions/setup-android@v4: v3 пытается поставить устаревший
-      # пакет 'tools' (Android SDK Tools выпилен, есть только
-      # platform-tools/build-tools/platforms). v4 этот пакет не запрашивает.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -40,7 +30,6 @@ jobs:
           build-tools-version: '37.0.0'
           auto-accept-licenses: true
 
-      # Кэширование зависимостей Gradle между ранами.
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -49,9 +38,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # ВАЖНО: -Dorg.gradle.java.home=$JAVA_HOME перебивает локальный
-      # Windows-путь из gradle.properties (его нет на Linux-раннере,
-      # Gradle бы упал при старте демона).
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon -Dorg.gradle.java.home=$JAVA_HOME
 

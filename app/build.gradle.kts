@@ -28,8 +28,8 @@ android {
         applicationId = "com.counter.game"
         minSdk = 24
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.2.0"
+        versionCode = 8
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
