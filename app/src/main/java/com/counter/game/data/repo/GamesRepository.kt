@@ -29,7 +29,14 @@ data class RoundInput(
     val gameId: Long,
     val winnerGamePlayerId: Long?,
     val winnerDelta: Int = 0,
-    val hands: Map<Long, Map<String, Int>>,
+    val hands: Map<Long, Map<String, Int>> = emptyMap(),
+    /**
+     * Ручной режим ввода: дельта для каждого проигравшего (по gamePlayerId).
+     * Если задано — для проигравших движок правил не вызывается, `round_cards` не пишутся,
+     * `delta_score` берётся напрямую из карты. Для победителя по-прежнему применяется
+     * `winnerDelta`. В БД пометка `mode=manual` пишется в `raw_input_json`.
+     */
+    val manualDelta: Map<Long, Int>? = null,
 )
 
 class GamesRepository(
@@ -105,28 +112,40 @@ class GamesRepository(
         val gamePlayers = gamePlayerDao.listByGame(input.gameId)
         val winnerId = input.winnerGamePlayerId
 
+        val manual = input.manualDelta
+        val isManual = manual != null
+
         for (gp in gamePlayers) {
+            val isWinner = gp.id == winnerId
             val hand: Map<String, Int> = input.hands[gp.id].orEmpty()
+            val rawJson = when {
+                isManual -> encodeManual(isWinner, manual!![gp.id], input.winnerDelta)
+                else -> encodeHand(hand)
+            }
             val entryId = roundEntryDao.insertEntry(
                 RoundEntryEntity(
                     roundId = roundId,
                     gamePlayerId = gp.id,
-                    rawInputJson = encodeHand(hand),
+                    rawInputJson = rawJson,
                 ),
             )
-            val cards = hand
-                .filter { it.value > 0 }
-                .map { (code, count) -> RoundCardEntity(roundEntryId = entryId, cardCode = code, count = count) }
-            if (cards.isNotEmpty()) roundEntryDao.insertCards(cards)
 
-            val delta = if (gp.id == winnerId) input.winnerDelta else {
-                val ctx = RuleContext(
-                    settings = settings,
-                    cardDefs = cardDefs,
-                    hand = RoundHand(cards = cards),
-                    totalScoreBeforeRound = gamePlayerDao.totalScore(input.gameId, gp.id),
-                )
-                engine.computeWith(parsedRules, ctx)
+            val delta: Int = when {
+                isWinner -> input.winnerDelta
+                isManual -> manual!![gp.id] ?: 0
+                else -> {
+                    val cards = hand
+                        .filter { it.value > 0 }
+                        .map { (code, count) -> RoundCardEntity(roundEntryId = entryId, cardCode = code, count = count) }
+                    if (cards.isNotEmpty()) roundEntryDao.insertCards(cards)
+                    val ctx = RuleContext(
+                        settings = settings,
+                        cardDefs = cardDefs,
+                        hand = RoundHand(cards = cards),
+                        totalScoreBeforeRound = gamePlayerDao.totalScore(input.gameId, gp.id),
+                    )
+                    engine.computeWith(parsedRules, ctx)
+                }
             }
             roundEntryDao.updateDelta(entryId, delta)
         }
@@ -176,4 +195,14 @@ class GamesRepository(
             put(code, count)
         }
     }.toString()
+
+    private fun encodeManual(isWinner: Boolean, manualDelta: Int?, winnerDelta: Int): String =
+        buildJsonObject {
+            put("mode", "manual")
+            if (isWinner) {
+                put("delta", winnerDelta)
+            } else {
+                put("delta", manualDelta ?: 0)
+            }
+        }.toString()
 }

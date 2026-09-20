@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -30,7 +31,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -48,12 +53,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.counter.game.AppContainer
 import com.counter.game.data.dao.GamePlayerWithScore
 import com.counter.game.ui.viewModelFactory
+
+private const val KEY_SAVED_ROUND = "saved_round_number"
 
 /**
  * Структура строки в редакторе карт. Группа — базовые карты, дамы и короли
@@ -109,6 +117,7 @@ fun RoundInputScreen(
     gameId: Long,
     onSaved: () -> Unit,
     onBack: () -> Unit,
+    navBackStackEntry: androidx.navigation.NavBackStackEntry? = null,
 ) {
     val vm: RoundInputViewModel = viewModel(factory = viewModelFactory(container))
     val state by vm.state.collectAsState()
@@ -120,13 +129,14 @@ fun RoundInputScreen(
     var winnerSectionExpanded by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(gameId) { vm.load(gameId) }
+    // Сразу после успешного сохранения раунда: кладём номер в savedStateHandle
+    // предыдущего backstack entry (GameScreen покажет snackbar у себя) и вызываем
+    // onSaved() — навигация назад не должна ждать авто-скрытия snackbar (~4 сек).
     LaunchedEffect(state.savedRoundNumber) {
-        val n = state.savedRoundNumber
-        if (n != null) {
-            snackbarHostState.showSnackbar("Раунд $n сохранён")
-            vm.consumeSaved()
-            onSaved()
-        }
+        val n = state.savedRoundNumber ?: return@LaunchedEffect
+        navBackStackEntry?.savedStateHandle?.set(KEY_SAVED_ROUND, n)
+        vm.consumeSaved()
+        onSaved()
     }
     LaunchedEffect(state.limitMessage) {
         state.limitMessage?.let { msg ->
@@ -144,7 +154,10 @@ fun RoundInputScreen(
         else listOf(expanded) + aliveLosers.filter { it.id != expandedPlayerId }
     }
     val hasWinner = state.winnerGamePlayerId != null
-    val hasAnyCards = state.handCounts.values.any { it.isNotEmpty() }
+    val hasAnyCards = when (state.inputMode) {
+        InputMode.CARDS -> state.handCounts.values.any { it.isNotEmpty() }
+        InputMode.MANUAL -> state.manualDelta.values.any { it != 0 }
+    }
     val canSave = !state.isSaving && (hasWinner || hasAnyCards)
 
     Scaffold(
@@ -187,23 +200,43 @@ fun RoundInputScreen(
                     subtitle = if (!hasWinner) "Можно начать без победителя — штраф 0 никому не начислится" else null,
                 )
 
+                InputModeSwitcher(
+                    mode = state.inputMode,
+                    onChange = vm::setInputMode,
+                )
+
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 ) {
-                    items(orderedLosers, key = { it.id }) { p ->
-                        PlayerCard(
-                            player = p,
-                            counts = state.handCounts[p.id].orEmpty(),
-                            cardDefs = state.cardDefs,
-                            expanded = expandedPlayerId == p.id,
-                            onToggleExpand = {
-                                expandedPlayerId = if (expandedPlayerId == p.id) null else p.id
-                            },
-                            onAdd = { code -> vm.tryAdd(p.id, code) },
-                            onRemove = { code -> vm.tryRemove(p.id, code) },
-                        )
+                    when (state.inputMode) {
+                        InputMode.CARDS -> {
+                            items(orderedLosers, key = { it.id }) { p ->
+                                PlayerCard(
+                                    player = p,
+                                    counts = state.handCounts[p.id].orEmpty(),
+                                    cardDefs = state.cardDefs,
+                                    expanded = expandedPlayerId == p.id,
+                                    onToggleExpand = {
+                                        expandedPlayerId = if (expandedPlayerId == p.id) null else p.id
+                                    },
+                                    onAdd = { code -> vm.tryAdd(p.id, code) },
+                                    onRemove = { code -> vm.tryRemove(p.id, code) },
+                                )
+                            }
+                        }
+                        InputMode.MANUAL -> {
+                            items(orderedLosers, key = { it.id }) { p ->
+                                ManualDeltaRow(
+                                    player = p,
+                                    value = state.manualDelta[p.id] ?: 0,
+                                    onChange = { newValue -> vm.setManualDelta(p.id, newValue) },
+                                    onIncrement = { vm.changeManualDelta(p.id, +1) },
+                                    onDecrement = { vm.changeManualDelta(p.id, -1) },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -775,4 +808,149 @@ private fun previewDelta(
         }
     }
     return total
+}
+
+/**
+ * Сегментированный переключатель «Карты / Вручную» над списком проигравших.
+ *
+ * При смене режима [RoundInputViewModel.setInputMode] сбрасывает уже введённые данные
+ * (карты или числа), чтобы не смешивать две независимые «корзины» в одном раунде.
+ * Этот композабл только переключает — никаких данных здесь не хранится.
+ */
+@Composable
+private fun InputModeSwitcher(
+    mode: InputMode,
+    onChange: (InputMode) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+            SegmentedButton(
+                selected = mode == InputMode.CARDS,
+                onClick = { onChange(InputMode.CARDS) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            ) { Text("Карты") }
+            SegmentedButton(
+                selected = mode == InputMode.MANUAL,
+                onClick = { onChange(InputMode.MANUAL) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            ) { Text("Вручную") }
+        }
+        Text(
+            if (mode == InputMode.CARDS) "Движок правил считает" else "Без правил — вводите итог",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+    }
+}
+
+/**
+ * Строка проигравшего в ручном режиме: имя, числовое поле и кнопки «+/−».
+ *
+ * Поле принимает произвольные целые (включая отрицательные — например, штраф −5).
+ * Под полем — строка-превью «итого очков» с подписью; для 0 показывается «0».
+ * При изменении значения через «+/−» фокус с текстового поля не сбрасывается —
+ * каждый чип имеет собственный click-handler.
+ */
+@Composable
+private fun ManualDeltaRow(
+    player: GamePlayerWithScore,
+    value: Int,
+    onChange: (Int) -> Unit,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+) {
+    var draft by rememberSaveable(player.id) { mutableStateOf(value.toString()) }
+    // Синхронизируем локальный черновик с состоянием VM, если оно изменилось
+    // снаружи (например, после save() или переключения режима).
+    LaunchedEffect(value) { draft = value.toString() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(8.dp),
+            )
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                player.displayName,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "текущий счёт: ${player.totalScore}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+        }
+        Spacer(Modifier.size(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IconButton(
+                onClick = onDecrement,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = "Уменьшить",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { newText ->
+                    // Разрешаем только то, что может распарситься как Int (включая «-»).
+                    val sanitized = newText.filter { it.isDigit() || it == '-' }
+                    draft = sanitized
+                    val parsed = sanitized.toIntOrNull()
+                    if (parsed != null) onChange(parsed)
+                },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = { Text("Итого очков") },
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                ),
+            )
+            IconButton(
+                onClick = onIncrement,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Увеличить",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+        }
+        Spacer(Modifier.size(4.dp))
+        Text(
+            "Дельта: " + if (value > 0) "+$value" else value.toString(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp,
+        )
+    }
 }
