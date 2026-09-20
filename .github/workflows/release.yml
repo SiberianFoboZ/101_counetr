@@ -33,12 +33,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Android SDK 36 + build-tools + licenses.
+      # Android SDK 37 + build-tools + licenses.
+      # android-actions/setup-android@v4: v3 пытается поставить устаревший
+      # пакет 'tools' (Android SDK Tools выпилен, есть только
+      # platform-tools/build-tools/platforms). v4 этот пакет не запрашивает.
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
-          api-level: 36
-          build-tools-version: '36.0.0'
+          api-level: 37
+          build-tools-version: '37.0.0'
           auto-accept-licenses: true
 
       # Кэширование зависимостей Gradle между ранами.
